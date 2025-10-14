@@ -5,22 +5,42 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 
+/// <summary>
+/// Main program class for SharpTranslate - a command-line tool for translating JSON localization files
+/// using OpenAI's API while preserving HTML tags, placeholders, and protected brand terms.
+/// </summary>
 class Program
 {
     // ---------- Config ----------
+    /// <summary>Default OpenAI model to use for translations</summary>
     const string DefaultModel = "gpt-4o-mini";
+    /// <summary>Number of strings to translate in each API batch call</summary>
     const int BatchSize = 15;
+    /// <summary>Maximum number of retry attempts for failed API calls</summary>
     const int MaxRetries = 5;
+    /// <summary>Sleep duration between API batch calls to respect rate limits</summary>
     const double SleepBetweenSeconds = 0.7;
 
     // Placeholder & HTML patterns to preserve exactly
+    /// <summary>Regex pattern to match HTML tags that should be preserved during translation</summary>
     static readonly Regex HtmlTag = new Regex(@"</?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>", RegexOptions.Compiled);
+    /// <summary>Regex pattern to match curly brace placeholders like {msg}, { email }, {0}</summary>
     static readonly Regex CurlyPlaceholder = new Regex(@"\{\s*[\w\.\-\[\]]+\s*\}", RegexOptions.Compiled); // {msg}, { email }, {0}
+    /// <summary>Regex pattern to match percent placeholders like %s, %d</summary>
     static readonly Regex PercentPlaceholder = new Regex(@"%\w", RegexOptions.Compiled);                    // %s, %d
+    /// <summary>Regex pattern to match mustache template placeholders like {{var}}</summary>
     static readonly Regex MustachePlaceholder = new Regex(@"\{\{\s*[\w\.\-]+\s*\}\}", RegexOptions.Compiled); // {{var}}
+    /// <summary>Regex pattern to match colon placeholders like :name</summary>
     static readonly Regex ColonPlaceholder = new Regex(@":\w+", RegexOptions.Compiled);                    // :name
+    /// <summary>Regex pattern to clean up whitespace followed by newlines</summary>
     static readonly Regex WhitespaceNewline = new Regex(@"\s+\n", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Main entry point for the SharpTranslate application.
+    /// Processes command-line arguments, loads and translates JSON files, and outputs the results.
+    /// </summary>
+    /// <param name="args">Command-line arguments for input/output files, language, and options</param>
+    /// <returns>Exit code: 0 for success, 1 for errors, 2 for invalid arguments</returns>
     static int Main(string[] args)
     {
         try
@@ -98,15 +118,29 @@ class Program
     }
 
     // ---------- CLI Options ----------
+    /// <summary>
+    /// Configuration class that holds all command-line options and settings for the translation process.
+    /// </summary>
     class CliOptions
     {
+        /// <summary>Path to the input JSON file containing English text to translate</summary>
         public string InputPath = "";
+        /// <summary>Path to the output JSON file where translated text will be written</summary>
         public string OutputPath = "";
+        /// <summary>Target language code in BCP 47 format (e.g., es-ES, fr-FR)</summary>
         public string TargetLanguage = "es-ES";
+        /// <summary>Tone and style instructions for the translation</summary>
         public string Tone = "Neutral, professional product UI tone";
+        /// <summary>OpenAI model to use for translation</summary>
         public string Model = DefaultModel;
+        /// <summary>List of brand terms and product names to protect from translation</summary>
         public List<string> ProtectedTerms = new();
 
+        /// <summary>
+        /// Parses command-line arguments and creates a CliOptions instance with the specified settings.
+        /// </summary>
+        /// <param name="args">Command-line arguments to parse</param>
+        /// <returns>CliOptions instance if parsing succeeds, null if invalid arguments or help requested</returns>
         public static CliOptions? Parse(string[] args)
         {
             var o = new CliOptions();
@@ -164,6 +198,13 @@ class Program
     }
 
     // ---------- JSON traversal ----------
+    /// <summary>
+    /// Recursively traverses a JSON structure and collects all string values along with their paths.
+    /// Handles objects, arrays, and primitive values while maintaining path information.
+    /// </summary>
+    /// <param name="node">Current JSON token to process</param>
+    /// <param name="path">Current path in dot notation (e.g., "user.profile.name")</param>
+    /// <param name="acc">Accumulator list to collect (path, text) pairs</param>
     static void CollectStrings(JToken node, string path, List<(string path, string text)> acc)
     {
         switch (node.Type)
@@ -192,6 +233,12 @@ class Program
     }
 
 
+    /// <summary>
+    /// Builds a compact JSON array string from a list of tokenized strings for API transmission.
+    /// Minimizes token usage by creating a clean JSON array without extra formatting.
+    /// </summary>
+    /// <param name="tokenizedBatch">List of tokenized strings to include in the JSON array</param>
+    /// <returns>Compact JSON array string</returns>
     static string BuildItemsJson(List<string> tokenizedBatch)
     {
         // Compact JSON array of strings to minimize tokens
@@ -206,6 +253,14 @@ class Program
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Sets a value at a specific path in a JSON structure, replacing the existing value.
+    /// Handles both property values and direct token replacement.
+    /// </summary>
+    /// <param name="root">Root JSON token to modify</param>
+    /// <param name="path">Path to the target location in dot notation</param>
+    /// <param name="value">New string value to set</param>
+    /// <exception cref="Exception">Thrown when the path is not found in the JSON structure</exception>
     static void SetByPath(JToken root, string path, string value)
     {
         var token = SelectTokenBySimplePath(root, path);
@@ -222,7 +277,13 @@ class Program
         }
     }
 
-    // Simple parser for a.b[2].c
+    /// <summary>
+    /// Simple path parser that navigates JSON structures using dot notation and array indexing.
+    /// Supports paths like "a.b[2].c" to traverse objects and arrays.
+    /// </summary>
+    /// <param name="root">Root JSON token to start navigation from</param>
+    /// <param name="path">Path string in dot notation with optional array indices</param>
+    /// <returns>The JSON token at the specified path, or null if not found</returns>
     static JToken? SelectTokenBySimplePath(JToken root, string path)
     {
         var parts = new List<string>();
@@ -253,6 +314,13 @@ class Program
     }
 
     // ---------- Tokenization / protection ----------
+    /// <summary>
+    /// Tokenizes a string by replacing HTML tags, placeholders, and protected terms with unique tokens.
+    /// This protects these elements from being altered during translation while preserving their original values.
+    /// </summary>
+    /// <param name="text">Input text to tokenize</param>
+    /// <param name="protectedTerms">List of brand terms and product names to protect</param>
+    /// <returns>A tuple containing the tokenized text and a mapping of tokens to original values</returns>
     static (string tokenized, Dictionary<string, string> map) Tokenize(string text, List<string> protectedTerms)
     {
         var map = new Dictionary<string, string>();
@@ -279,6 +347,13 @@ class Program
         return (t, map);
     }
 
+    /// <summary>
+    /// Restores original values by replacing tokens with their corresponding original text.
+    /// This reverses the tokenization process after translation is complete.
+    /// </summary>
+    /// <param name="text">Translated text containing tokens to replace</param>
+    /// <param name="map">Dictionary mapping tokens to their original values</param>
+    /// <returns>Text with all tokens replaced by their original values</returns>
     static string Detokenize(string text, Dictionary<string, string> map)
     {
         foreach (var kv in map.OrderByDescending(k => k.Key.Length))
@@ -289,6 +364,14 @@ class Program
     }
 
     // ---------- OpenAI Translation ----------
+    /// <summary>
+    /// Orchestrates the translation of all strings by processing them in batches.
+    /// Includes rate limiting between batches to respect API quotas.
+    /// </summary>
+    /// <param name="tokenized">List of tokenized strings to translate</param>
+    /// <param name="cli">CLI options containing translation settings</param>
+    /// <param name="apiKey">OpenAI API key for authentication</param>
+    /// <returns>List of translated strings in the same order as input</returns>
     static async Task<List<string>> TranslateAllBatchesAsync(List<string> tokenized, CliOptions cli, string apiKey)
     {
         var results = new List<string>(tokenized.Count);
@@ -302,6 +385,16 @@ class Program
         return results;
     }
 
+    /// <summary>
+    /// Translates a single batch of strings using OpenAI's API with structured output and retry logic.
+    /// Implements comprehensive error handling and validation of translation results.
+    /// </summary>
+    /// <param name="batch">Batch of tokenized strings to translate</param>
+    /// <param name="cli">CLI options containing translation settings</param>
+    /// <param name="apiKey">OpenAI API key for authentication</param>
+    /// <param name="attempt">Current attempt number for retry logic</param>
+    /// <returns>List of translated strings matching the input batch size and order</returns>
+    /// <exception cref="Exception">Thrown when API calls fail after all retries or when response validation fails</exception>
     static async Task<List<string>> TranslateBatchAsync(List<string> batch, CliOptions cli, string apiKey, int attempt)
     {
         var system = $@"You are a professional localizer for product UIs.

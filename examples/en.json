@@ -1,0 +1,24 @@
+{
+  "welcome": "Welcome to {appName}!",
+  "greeting": "Hello, {{username}}",
+  "nav": {
+    "home": "Home",
+    "profile": "Profile", 
+    "settings": "Settings"
+  },
+  "buttons": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "delete": "Delete Item"
+  },
+  "messages": [
+    "Error: %s occurred while processing",
+    "Success! Your changes have been saved.",
+    "Please check your <strong>email</strong> for confirmation"
+  ],
+  "forms": {
+    "email": "Email Address",
+    "password": "Password",
+    "confirm": "Confirm Password"
+  }
+}
