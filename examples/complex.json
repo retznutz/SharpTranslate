@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "MyApp",
+    "tagline": "The best app for managing your tasks"
+  },
+  "ui": {
+    "buttons": {
+      "primary": "Get Started",
+      "secondary": "Learn More"
+    },
+    "tooltips": [
+      "Click here to add a new task",
+      "Use Ctrl+S to save your work",
+      "Drag items to reorder them"
+    ]
+  },
+  "notifications": {
+    "success": "Task '{taskName}' completed successfully!",
+    "warning": "Please save your work before closing",
+    "error": "Failed to connect to server. Error code: %d"
+  },
+  "templates": {
+    "welcome_email": "Hello {{customer.name}}, welcome to MyApp!",
+    "reset_password": "Click <a href='{resetLink}'>here</a> to reset your password"
+  }
+}
