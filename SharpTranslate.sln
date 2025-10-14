@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36518.9 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTranslate", "SharpTranslate\SharpTranslate.csproj", "{D7837AFD-0CD7-4772-83B8-63667666CDB6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D7837AFD-0CD7-4772-83B8-63667666CDB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7837AFD-0CD7-4772-83B8-63667666CDB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7837AFD-0CD7-4772-83B8-63667666CDB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7837AFD-0CD7-4772-83B8-63667666CDB6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6B9939FB-E9EB-462E-AC6D-39CF17B7F6B3}
+	EndGlobalSection
+EndGlobal
