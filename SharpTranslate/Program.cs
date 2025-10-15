@@ -82,6 +82,7 @@ class Program
             }
 
             // Translate in batches
+            Console.WriteLine($"Translating {items.Count} strings in {Math.Ceiling((double)items.Count / BatchSize)} batches...");
             var translated = TranslateAllBatchesAsync(
                 tokenized, cli, apiKey
             ).GetAwaiter().GetResult();
@@ -366,7 +367,7 @@ class Program
     // ---------- OpenAI Translation ----------
     /// <summary>
     /// Orchestrates the translation of all strings by processing them in batches.
-    /// Includes rate limiting between batches to respect API quotas.
+    /// Includes rate limiting between batches to respect API quotas and progress reporting.
     /// </summary>
     /// <param name="tokenized">List of tokenized strings to translate</param>
     /// <param name="cli">CLI options containing translation settings</param>
@@ -375,13 +376,30 @@ class Program
     static async Task<List<string>> TranslateAllBatchesAsync(List<string> tokenized, CliOptions cli, string apiKey)
     {
         var results = new List<string>(tokenized.Count);
+        var totalBatches = Math.Ceiling((double)tokenized.Count / BatchSize);
+        var batchNumber = 0;
+
         for (int i = 0; i < tokenized.Count; i += BatchSize)
         {
+            batchNumber++;
             var batch = tokenized.Skip(i).Take(BatchSize).ToList();
+            
+            // Calculate and display progress
+            var itemsProcessed = Math.Min(i + BatchSize, tokenized.Count);
+            var percentComplete = (double)itemsProcessed / tokenized.Count * 100;
+            
+            Console.Write($"\rProcessing batch {batchNumber}/{totalBatches} - {itemsProcessed}/{tokenized.Count} items ({percentComplete:F1}%)...");
+            
             var outs = await TranslateBatchAsync(batch, cli, apiKey, attempt: 1);
             results.AddRange(outs);
-            await Task.Delay(TimeSpan.FromSeconds(SleepBetweenSeconds));
+            
+            if (i + BatchSize < tokenized.Count) // Don't delay after the last batch
+            {
+                await Task.Delay(TimeSpan.FromSeconds(SleepBetweenSeconds));
+            }
         }
+        
+        Console.WriteLine("\rTranslation complete!" + new string(' ', 50));
         return results;
     }
 
