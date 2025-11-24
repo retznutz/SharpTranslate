@@ -5,6 +5,7 @@ A powerful C# command-line tool for translating JSON localization files using Op
 ## Features
 
 - **Smart Translation**: Uses OpenAI's GPT models for high-quality, contextually appropriate translations
+- **Selective Key Updates**: Update only specific keys in existing translation files without re-translating everything
 - **Placeholder Preservation**: Automatically protects various placeholder formats:
   - Curly braces: `{msg}`, `{email}`, `{0}`
   - Percent placeholders: `%s`, `%d`
@@ -80,6 +81,7 @@ dotnet run -- --in en.json --out es-ES.json --lang es-ES
 --tone <text>          Translation tone/style (default: "Neutral, professional product UI tone")
 --model <name>         OpenAI model to use (default: "gpt-4o-mini")
 --protect <CSV>        Comma-separated list of protected brand terms
+--keys <CSV>           Specific keys to translate (updates only these keys). If omitted, translates all keys.
 ```
 
 ### Examples
@@ -98,6 +100,14 @@ dotnet run -- --in en.json --out fr-FR.json --lang fr-FR --protect "MyBrand,Prod
 ```bash
 dotnet run -- --in en.json --out de-DE.json --lang de-DE --tone "Casual, friendly tone" --model "gpt-4"
 ```
+
+#### Selective Key Updates
+Update only specific keys in an existing translation file:
+```bash
+dotnet run -- --in en.json --out es-ES.json --lang es-ES --keys "welcome,nav.home,buttons.save"
+```
+
+This is useful when you only want to update a few strings without re-translating the entire file. If the output file exists, it will be loaded and only the specified keys will be updated with new translations.
 
 ## Input/Output Format
 
