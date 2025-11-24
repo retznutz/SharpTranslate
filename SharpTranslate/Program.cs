@@ -59,14 +59,26 @@ class Program
             var inputText = File.ReadAllText(cli.InputPath, Encoding.UTF8);
             var root = JToken.Parse(inputText);
 
+            // If output file exists and we're doing selective key updates, load it as the base
+            JToken output;
+            if (cli.SpecificKeys != null && cli.SpecificKeys.Count > 0 && File.Exists(cli.OutputPath))
+            {
+                var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
+                output = JToken.Parse(outputText);
+            }
+            else
+            {
+                output = root.DeepClone();
+            }
+
             // Collect all translatable strings
             var items = new List<(string path, string text)>();
-            CollectStrings(root, "", items);
+            CollectStrings(root, "", items, cli.SpecificKeys);
 
             if (items.Count == 0)
             {
                 Console.WriteLine("No strings found to translate.");
-                File.WriteAllText(cli.OutputPath, root.ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
+                File.WriteAllText(cli.OutputPath, output.ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
                 return 0;
             }
 
@@ -100,7 +112,6 @@ class Program
             }
 
             // Write back
-            var output = root.DeepClone();
             for (int i = 0; i < items.Count; i++)
             {
                 SetByPath(output, items[i].path, finalStrings[i]);
@@ -136,6 +147,8 @@ class Program
         public string Model = DefaultModel;
         /// <summary>List of brand terms and product names to protect from translation</summary>
         public List<string> ProtectedTerms = new();
+        /// <summary>Optional list of specific keys to translate (if null or empty, translates all keys)</summary>
+        public List<string>? SpecificKeys = null;
 
         /// <summary>
         /// Parses command-line arguments and creates a CliOptions instance with the specified settings.
@@ -171,6 +184,12 @@ class Program
                             .Distinct(StringComparer.Ordinal)
                             .ToList();
                         break;
+                    case "--keys":
+                        o.SpecificKeys = args[++i]
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+                        break;
                     default:
                         Console.Error.WriteLine($"Unknown arg: {args[i]}");
                         return null;
@@ -187,6 +206,7 @@ class Program
                   --tone <text>          Tone/style hint. Default: Neutral, professional product UI tone
                   --model <name>         OpenAI model. Default: gpt-4o-mini
                   --protect <CSV>        Brand terms to keep exactly (e.g., ""Guidestr,Stripe,Roku"")
+                  --keys <CSV>           Specific keys to translate (e.g., ""welcome,nav.home,buttons.save""). If omitted, translates all keys.
 
                 Example:
                   dotnet run -- --in en.json --out es-ES.json --lang es-ES --protect ""Guidestr,Stripe,Roku"""
@@ -206,7 +226,8 @@ class Program
     /// <param name="node">Current JSON token to process</param>
     /// <param name="path">Current path in dot notation (e.g., "user.profile.name")</param>
     /// <param name="acc">Accumulator list to collect (path, text) pairs</param>
-    static void CollectStrings(JToken node, string path, List<(string path, string text)> acc)
+    /// <param name="specificKeys">Optional list of specific keys to filter by. If null or empty, collects all keys.</param>
+    static void CollectStrings(JToken node, string path, List<(string path, string text)> acc, List<string>? specificKeys = null)
     {
         switch (node.Type)
         {
@@ -214,7 +235,7 @@ class Program
                 foreach (var prop in ((JObject)node).Properties())
                 {
                     var p = string.IsNullOrEmpty(path) ? prop.Name : $"{path}.{prop.Name}";
-                    CollectStrings(prop.Value, p, acc);
+                    CollectStrings(prop.Value, p, acc, specificKeys);
                 }
                 break;
             case JTokenType.Array:
@@ -222,11 +243,15 @@ class Program
                 foreach (var item in (JArray)node)
                 {
                     var p = $"{path}[{idx++}]";
-                    CollectStrings(item, p, acc);
+                    CollectStrings(item, p, acc, specificKeys);
                 }
                 break;
             case JTokenType.String:
-                acc.Add((path, node.Value<string>() ?? ""));
+                // If specificKeys is provided, only collect strings matching those keys
+                if (specificKeys == null || specificKeys.Count == 0 || specificKeys.Contains(path, StringComparer.Ordinal))
+                {
+                    acc.Add((path, node.Value<string>() ?? ""));
+                }
                 break;
             default:
                 break;
