@@ -151,6 +151,19 @@ class Program
         public List<string>? SpecificKeys = null;
 
         /// <summary>
+        /// Parses a comma-separated string into a list of distinct values.
+        /// </summary>
+        /// <param name="input">Comma-separated string to parse</param>
+        /// <returns>List of distinct trimmed values</returns>
+        private static List<string> ParseCommaSeparatedList(string input)
+        {
+            return input
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
+
+        /// <summary>
         /// Parses command-line arguments and creates a CliOptions instance with the specified settings.
         /// </summary>
         /// <param name="args">Command-line arguments to parse</param>
@@ -179,16 +192,10 @@ class Program
                         o.Model = args[++i];
                         break;
                     case "--protect":
-                        o.ProtectedTerms = args[++i]
-                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                            .Distinct(StringComparer.Ordinal)
-                            .ToList();
+                        o.ProtectedTerms = ParseCommaSeparatedList(args[++i]);
                         break;
                     case "--keys":
-                        o.SpecificKeys = args[++i]
-                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                            .Distinct(StringComparer.Ordinal)
-                            .ToList();
+                        o.SpecificKeys = ParseCommaSeparatedList(args[++i]);
                         break;
                     default:
                         Console.Error.WriteLine($"Unknown arg: {args[i]}");
@@ -331,7 +338,7 @@ class Program
             else
             {
                 if (current.Type != JTokenType.Object) return null;
-                current = ((JObject)current).Property(part) ?? ((JObject)current).Property(part, StringComparison.Ordinal);
+                current = ((JObject)current).Property(part);
                 if (current == null) return null;
                 current = ((JProperty)current).Value;
             }
