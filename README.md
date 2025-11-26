@@ -82,6 +82,7 @@ dotnet run -- --in en.json --out es-ES.json --lang es-ES
 --model <name>         OpenAI model to use (default: "gpt-4o-mini")
 --protect <CSV>        Comma-separated list of protected brand terms
 --keys <CSV>           Specific keys to translate (updates only these keys). If omitted, translates all keys.
+--new-keys-only        Only translate keys in the input file that don't exist in the output file. Requires output file to exist.
 ```
 
 ### Examples
@@ -108,6 +109,14 @@ dotnet run -- --in en.json --out es-ES.json --lang es-ES --keys "welcome,nav.hom
 ```
 
 This is useful when you only want to update a few strings without re-translating the entire file. If the output file exists, it will be loaded and only the specified keys will be updated with new translations.
+
+#### New Keys Only (Incremental Updates)
+Translate only keys that are new in the input file compared to the existing output file:
+```bash
+dotnet run -- --in en.json --out es-ES.json --lang es-ES --new-keys-only
+```
+
+This feature is perfect for incremental translations when you've added new strings to your English source file. It compares the keys in both files and translates only the ones that don't yet exist in the output, making translations faster and more cost-effective. The output file must already exist for this option to work.
 
 ## Input/Output Format
 
