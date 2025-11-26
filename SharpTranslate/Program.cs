@@ -59,12 +59,59 @@ class Program
             var inputText = File.ReadAllText(cli.InputPath, Encoding.UTF8);
             var root = JToken.Parse(inputText);
 
+            // Determine which keys to translate
+            List<string>? keysToTranslate = cli.SpecificKeys;
+            JToken? existingOutput = null;
+            
+            // If --new-keys-only is specified, calculate the difference
+            if (cli.NewKeysOnly)
+            {
+                if (!File.Exists(cli.OutputPath))
+                {
+                    Console.Error.WriteLine("ERROR: --new-keys-only requires the output file to exist for comparison.");
+                    return 2;
+                }
+
+                var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
+                existingOutput = JToken.Parse(outputText);
+
+                // Collect all keys from both files
+                var inputKeys = new HashSet<string>();
+                var outputKeys = new HashSet<string>();
+                CollectKeys(root, "", inputKeys);
+                CollectKeys(existingOutput, "", outputKeys);
+
+                // Find keys that are in input but not in output
+                var newKeys = inputKeys.Except(outputKeys).ToList();
+                
+                if (newKeys.Count == 0)
+                {
+                    Console.WriteLine("No new keys found. Output file already contains all keys from input.");
+                    return 0;
+                }
+
+                Console.WriteLine($"Found {newKeys.Count} new keys to translate.");
+                keysToTranslate = newKeys;
+            }
+
             // If output file exists and we're doing selective key updates, load it as the base
             JToken output;
-            if (cli.SpecificKeys != null && cli.SpecificKeys.Count > 0 && File.Exists(cli.OutputPath))
+            if (keysToTranslate != null && keysToTranslate.Count > 0)
             {
-                var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
-                output = JToken.Parse(outputText);
+                if (existingOutput != null)
+                {
+                    // Reuse already loaded output when using --new-keys-only
+                    output = existingOutput;
+                }
+                else if (File.Exists(cli.OutputPath))
+                {
+                    var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
+                    output = JToken.Parse(outputText);
+                }
+                else
+                {
+                    output = root.DeepClone();
+                }
             }
             else
             {
@@ -73,7 +120,7 @@ class Program
 
             // Collect all translatable strings
             var items = new List<(string path, string text)>();
-            CollectStrings(root, "", items, cli.SpecificKeys);
+            CollectStrings(root, "", items, keysToTranslate);
 
             if (items.Count == 0)
             {
@@ -149,6 +196,8 @@ class Program
         public List<string> ProtectedTerms = new();
         /// <summary>Optional list of specific keys to translate (if null or empty, translates all keys)</summary>
         public List<string>? SpecificKeys = null;
+        /// <summary>When true, only translate keys that exist in input but not in output file</summary>
+        public bool NewKeysOnly = false;
 
         /// <summary>
         /// Parses a comma-separated string into a list of distinct values.
@@ -197,6 +246,9 @@ class Program
                     case "--keys":
                         o.SpecificKeys = ParseCommaSeparatedList(args[++i]);
                         break;
+                    case "--new-keys-only":
+                        o.NewKeysOnly = true;
+                        break;
                     default:
                         Console.Error.WriteLine($"Unknown arg: {args[i]}");
                         return null;
@@ -214,10 +266,12 @@ class Program
                   --model <name>         OpenAI model. Default: gpt-4o-mini
                   --protect <CSV>        Brand terms to keep exactly (e.g., ""Guidestr,Stripe,Roku"")
                   --keys <CSV>           Specific keys to translate (e.g., ""welcome,nav.home,buttons.save""). If omitted, translates all keys.
+                  --new-keys-only        Only translate keys in the input file that don't exist in the output file. Requires output file to exist.
 
                 Example:
-                  dotnet run -- --in en.json --out es-ES.json --lang es-ES --protect ""Guidestr,Stripe,Roku"""
-                );
+                  dotnet run -- --in en.json --out es-ES.json --lang es-ES --protect ""Guidestr,Stripe,Roku""
+                  dotnet run -- --in en.json --out es-ES.json --lang es-ES --new-keys-only
+                ");
                 return null;
             }
 
@@ -226,6 +280,39 @@ class Program
     }
 
     // ---------- JSON traversal ----------
+    /// <summary>
+    /// Collects all keys from a JSON structure into a set, including nested keys using dot notation.
+    /// </summary>
+    /// <param name="node">Current JSON token to process</param>
+    /// <param name="path">Current path in dot notation</param>
+    /// <param name="keys">Set to collect all key paths</param>
+    static void CollectKeys(JToken node, string path, HashSet<string> keys)
+    {
+        switch (node.Type)
+        {
+            case JTokenType.Object:
+                foreach (var prop in ((JObject)node).Properties())
+                {
+                    var p = string.IsNullOrEmpty(path) ? prop.Name : $"{path}.{prop.Name}";
+                    CollectKeys(prop.Value, p, keys);
+                }
+                break;
+            case JTokenType.Array:
+                int idx = 0;
+                foreach (var item in (JArray)node)
+                {
+                    var p = $"{path}[{idx++}]";
+                    CollectKeys(item, p, keys);
+                }
+                break;
+            case JTokenType.String:
+                keys.Add(path);
+                break;
+            default:
+                break;
+        }
+    }
+
     /// <summary>
     /// Recursively traverses a JSON structure and collects all string values along with their paths.
     /// Handles objects, arrays, and primitive values while maintaining path information.
