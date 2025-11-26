@@ -61,6 +61,7 @@ class Program
 
             // Determine which keys to translate
             List<string>? keysToTranslate = cli.SpecificKeys;
+            JToken? existingOutput = null;
             
             // If --new-keys-only is specified, calculate the difference
             if (cli.NewKeysOnly)
@@ -72,13 +73,13 @@ class Program
                 }
 
                 var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
-                var outputRoot = JToken.Parse(outputText);
+                existingOutput = JToken.Parse(outputText);
 
                 // Collect all keys from both files
                 var inputKeys = new HashSet<string>();
                 var outputKeys = new HashSet<string>();
                 CollectKeys(root, "", inputKeys);
-                CollectKeys(outputRoot, "", outputKeys);
+                CollectKeys(existingOutput, "", outputKeys);
 
                 // Find keys that are in input but not in output
                 var newKeys = inputKeys.Except(outputKeys).ToList();
@@ -95,10 +96,22 @@ class Program
 
             // If output file exists and we're doing selective key updates, load it as the base
             JToken output;
-            if (keysToTranslate != null && keysToTranslate.Count > 0 && File.Exists(cli.OutputPath))
+            if (keysToTranslate != null && keysToTranslate.Count > 0)
             {
-                var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
-                output = JToken.Parse(outputText);
+                if (existingOutput != null)
+                {
+                    // Reuse already loaded output when using --new-keys-only
+                    output = existingOutput;
+                }
+                else if (File.Exists(cli.OutputPath))
+                {
+                    var outputText = File.ReadAllText(cli.OutputPath, Encoding.UTF8);
+                    output = JToken.Parse(outputText);
+                }
+                else
+                {
+                    output = root.DeepClone();
+                }
             }
             else
             {
